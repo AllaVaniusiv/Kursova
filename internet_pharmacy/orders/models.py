@@ -190,13 +190,24 @@ class OrderItem(models.Model):
     def __str__(self):
         return f"{self.medication.name} x {self.quantity}"
 
+    # def get_total_price(self):
+    #     """Повертає загальну ціну за товар"""
+    #     return self.price * self.quantity
+
     def get_total_price(self):
         """Повертає загальну ціну за товар"""
+        if self.price is None:
+            return 0
         return self.price * self.quantity
 
+    # def save(self, *args, **kwargs):
+    #     # Зберігаємо ціну на момент замовлення
+    #     if not self.price:
+    #         self.price = self.medication.price
+    #     super().save(*args, **kwargs)
     def save(self, *args, **kwargs):
         # Зберігаємо ціну на момент замовлення
-        if not self.price:
+        if self.price is None and self.medication:
             self.price = self.medication.price
         super().save(*args, **kwargs)
 

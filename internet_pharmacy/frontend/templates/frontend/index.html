@@ -1,0 +1,175 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Головна - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<div class="hero">
+    <div class="container text-center">
+        <h1 class="display-4 mb-4">
+            <i class="fas fa-heartbeat"></i> Ваше здоров'я - наш пріоритет
+        </h1>
+        <p class="lead mb-4">
+            Швидка доставка якісних медикаментів по Львову
+        </p>
+        <a href="{% url 'frontend:medications' %}" class="btn btn-light btn-lg">
+            <i class="fas fa-capsules"></i> Переглянути каталог
+        </a>
+    </div>
+</div>
+
+<div class="container">
+    <!-- Features -->
+    <div class="row mb-5">
+        <div class="col-md-4 mb-4">
+            <div class="card text-center p-4">
+                <div class="card-body">
+                    <i class="fas fa-shipping-fast fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Швидка доставка</h5>
+                    <p class="card-text">Доставляємо препарати протягом 2-3 годин по місту Львів</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card text-center p-4">
+                <div class="card-body">
+                    <i class="fas fa-certificate fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Сертифіковані ліки</h5>
+                    <p class="card-text">Всі препарати мають сертифікати якості та ліцензії</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4 mb-4">
+            <div class="card text-center p-4">
+                <div class="card-body">
+                    <i class="fas fa-gift fa-3x text-primary mb-3"></i>
+                    <h5 class="card-title">Бонусна програма</h5>
+                    <p class="card-text">Накопичуйте бонуси та отримуйте знижки до 10%</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Popular Medications -->
+    <h2 class="mb-4"><i class="fas fa-fire"></i> Популярні препарати</h2>
+    <div class="row" id="popular-medications">
+        <div class="col-12 text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Завантаження...</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stats -->
+    {% if user.is_authenticated %}
+    <div class="row mt-5 mb-5">
+        <div class="col-md-3">
+            <div class="card text-center p-3">
+                <h3 class="text-primary">{{ user.bonus_points }}</h3>
+                <p class="mb-0">Бонусних балів</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center p-3">
+                <h3 class="text-primary">{{ user.get_discount }}%</h3>
+                <p class="mb-0">Ваша знижка</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center p-3">
+                <h3 class="text-primary">{{ user.orders.count }}</h3>
+                <p class="mb-0">Замовлень</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card text-center p-3">
+                <h3 class="text-primary">{{ user.get_card_type_display }}</h3>
+                <p class="mb-0">Тип картки</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    
+    <!-- Info Blocks -->
+    <div class="row mt-5">
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-question-circle text-primary"></i> Як зробити замовлення?
+                    </h5>
+                    <ol>
+                        <li>Оберіть потрібні препарати з каталогу</li>
+                        <li>Додайте їх до кошика</li>
+                        <li>Оформіть замовлення з доставкою або самовивозом</li>
+                        <li>Отримайте ліки та бонусні бали</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6 mb-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-hospital text-primary"></i> Наші аптеки
+                    </h5>
+                    <p>Ми маємо {{ pharmacies_count }} аптек по Львову:</p>
+                    <ul>
+                        <li>Аптека №1 - Центр (вул. Городоцька, 123)</li>
+                        <li>Аптека №2 - Сихів (вул. Наукова, 45)</li>
+                        <li>Аптека №3 - Франківський (вул. Під Дубом, 78)</li>
+                    </ul>
+                    <a href="{% url 'frontend:pharmacies' %}" class="btn btn-primary">
+                        Переглянути всі аптеки
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Завантаження популярних медикаментів
+    fetch('/api/medications/?page_size=4')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('popular-medications');
+            container.innerHTML = '';
+            
+            data.results.forEach(med => {
+                const col = document.createElement('div');
+                col.className = 'col-md-3 mb-4';
+                
+                col.innerHTML = `
+                    <div class="card medication-card">
+                        ${med.image ? `<img src="${med.image}" class="medication-image" alt="${med.name}">` : 
+                        '<div class="medication-image bg-light d-flex align-items-center justify-content-center"><i class="fas fa-pills fa-3x text-muted"></i></div>'}
+                        <div class="card-body">
+                            <h5 class="card-title">${med.name}</h5>
+                            <p class="card-text text-muted">${med.manufacturer}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span class="price-tag">${med.price} грн</span>
+                                ${med.in_stock ? '<span class="badge badge-available">В наявності</span>' : '<span class="badge bg-secondary">Немає</span>'}
+                            </div>
+                            <a href="/medications/${med.id}/" class="btn btn-primary w-100 mt-3">
+                                Переглянути
+                            </a>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(col);
+            });
+        })
+        .catch(error => {
+            console.error('Error loading medications:', error);
+            document.getElementById('popular-medications').innerHTML = 
+                '<div class="col-12"><p class="text-danger">Помилка завантаження препаратів</p></div>';
+        });
+</script>
+{% endblock %}

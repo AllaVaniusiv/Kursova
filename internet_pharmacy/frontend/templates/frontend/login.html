@@ -1,0 +1,96 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Вхід - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-5">
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4">
+                        <i class="fas fa-sign-in-alt text-primary"></i> Вхід
+                    </h2>
+                    
+                    {% if messages %}
+                        {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Ім'я користувача</label>
+                            <input type="text" class="form-control form-control-lg" 
+                                   name="username" required autofocus>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Пароль</label>
+                            <input type="password" class="form-control form-control-lg" 
+                                   name="password" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" name="remember" id="remember">
+                                <label class="form-check-label" for="remember">
+                                    Запам'ятати мене
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <input type="hidden" name="next" value="{{ next }}">
+                        
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                            <i class="fas fa-sign-in-alt"></i> Увійти
+                        </button>
+                        
+                        <div class="text-center">
+                            <p class="mb-2">
+                                <a href="#">Забули пароль?</a>
+                            </p>
+                            <p class="mb-0">
+                                Немає акаунту? 
+                                <a href="{% url 'frontend:register' %}">Зареєструватися</a>
+                            </p>
+                        </div>
+                    </form>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        <p class="text-muted small mb-2">Тестові акаунти:</p>
+                        <div class="d-grid gap-2">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="fillTestUser('ivan_petrov')">
+                                <i class="fas fa-user"></i> ivan_petrov (Стандарт)
+                            </button>
+                            <button class="btn btn-outline-warning btn-sm" onclick="fillTestUser('maria_koval')">
+                                <i class="fas fa-crown"></i> maria_koval (Преміум)
+                            </button>
+                            <button class="btn btn-outline-info btn-sm" onclick="fillTestUser('olga_shevchenko')">
+                                <i class="fas fa-heart"></i> olga_shevchenko (Соціальна)
+                            </button>
+                        </div>
+                        <p class="text-muted small mt-2">Пароль для всіх: <code>password123</code></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function fillTestUser(username) {
+    document.querySelector('input[name="username"]').value = username;
+    document.querySelector('input[name="password"]').value = 'password123';
+}
+</script>
+{% endblock %}

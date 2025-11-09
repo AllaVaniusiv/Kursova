@@ -1,0 +1,276 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}{{ medication.name }} - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'frontend:index' %}">Головна</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'frontend:medications' %}">Каталог</a></li>
+            <li class="breadcrumb-item active">{{ medication.name }}</li>
+        </ol>
+    </nav>
+    
+    <div class="row">
+        <!-- Image and Quick Info -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                {% if medication.image %}
+                    <img src="{{ medication.image.url }}" class="card-img-top" alt="{{ medication.name }}">
+                {% else %}
+                    <div class="bg-light p-5 text-center">
+                        <i class="fas fa-pills fa-5x text-muted"></i>
+                    </div>
+                {% endif %}
+                <div class="card-body">
+                    <h3 class="price-tag mb-3">{{ medication.price }} грн</h3>
+                    
+                    <div class="mb-3">
+                        {% if medication.is_in_stock %}
+                            <span class="badge badge-available">
+                                <i class="fas fa-check"></i> В наявності
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">
+                                <i class="fas fa-times"></i> Немає в наявності
+                            </span>
+                        {% endif %}
+                        
+                        {% if medication.is_prescription %}
+                            <span class="badge badge-prescription">
+                                <i class="fas fa-prescription"></i> За рецептом
+                            </span>
+                        {% endif %}
+                    </div>
+                    
+                    {% if user.is_authenticated and medication.is_in_stock %}
+                        <div class="mb-3">
+                            <label class="form-label">Кількість:</label>
+                            <input type="number" class="form-control" id="quantity" value="1" min="1" max="10">
+                        </div>
+                        
+                        <button class="btn btn-success btn-lg w-100" onclick="addToCart()">
+                            <i class="fas fa-cart-plus"></i> Додати в кошик
+                        </button>
+                    {% elif not user.is_authenticated %}
+                        <a href="{% url 'login' %}" class="btn btn-primary btn-lg w-100">
+                            <i class="fas fa-sign-in-alt"></i> Увійдіть для замовлення
+                        </a>
+                    {% endif %}
+                    
+                    <button class="btn btn-outline-primary w-100 mt-2" onclick="checkAvailability()">
+                        <i class="fas fa-map-marker-alt"></i> Перевірити наявність в аптеках
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Details -->
+        <div class="col-md-8">
+            <h1 class="mb-3">{{ medication.name }}</h1>
+            
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-info-circle text-primary"></i> Основна інформація
+                    </h5>
+                    
+                    <table class="table table-borderless">
+                        <tr>
+                            <td width="30%"><strong>Виробник:</strong></td>
+                            <td>{{ medication.manufacturer }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Категорія:</strong></td>
+                            <td>{{ medication.get_category_display }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Діюча речовина:</strong></td>
+                            <td>{{ medication.active_ingredient|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Дозування:</strong></td>
+                            <td>{{ medication.dosage|default:"—" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Рецептурний:</strong></td>
+                            <td>
+                                {% if medication.is_prescription %}
+                                    <span class="text-danger">Так, потрібен рецепт</span>
+                                {% else %}
+                                    <span class="text-success">Ні, без рецепта</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            {% if medication.description %}
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-file-alt text-primary"></i> Опис
+                    </h5>
+                    <p>{{ medication.description }}</p>
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Availability in pharmacies -->
+            <div class="card mb-4" id="availability-card" style="display: none;">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-hospital text-primary"></i> Наявність в аптеках
+                    </h5>
+                    <div id="availability-content">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Завантаження...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const medicationId = {{ medication.id }};
+
+// Додати в кошик
+{% if user.is_authenticated %}
+function addToCart() {
+    const quantity = document.getElementById('quantity').value;
+    
+    const formData = new FormData();
+    formData.append('medication_id', medicationId);
+    formData.append('quantity', quantity);
+    
+    fetch('/cart/add/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Оновлюємо лічильник
+            document.getElementById('cart-count').textContent = data.cart_count;
+            showAlert('success', data.message);
+        } else {
+            showAlert('danger', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Помилка додавання в кошик');
+    });
+}
+{% endif %}
+
+// Перевірити наявність
+function checkAvailability() {
+    document.getElementById('availability-card').style.display = 'block';
+    document.getElementById('availability-content').innerHTML = `
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Завантаження...</span>
+            </div>
+        </div>
+    `;
+    
+    fetch(`/api/medications/${medicationId}/availability/`)
+        .then(response => response.json())
+        .then(data => {
+            let html = '';
+            
+            if (data.available_pharmacies.length === 0) {
+                html = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i> 
+                        На жаль, цей препарат наразі відсутній в наших аптеках
+                    </div>
+                `;
+            } else {
+                html = '<div class="list-group">';
+                data.available_pharmacies.forEach(pharmacy => {
+                    html += `
+                        <div class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div>
+                                    <h6 class="mb-1">${pharmacy.pharmacy_name}</h6>
+                                    <p class="mb-1 text-muted small">
+                                        <i class="fas fa-map-marker-alt"></i> ${pharmacy.address}
+                                    </p>
+                                    <p class="mb-0 text-muted small">
+                                        <i class="fas fa-phone"></i> ${pharmacy.phone}
+                                    </p>
+                                </div>
+                                <span class="badge badge-available">
+                                    ${pharmacy.quantity} шт.
+                                </span>
+                            </div>
+                        </div>
+                    `;
+                });
+                html += '</div>';
+                
+                html += `
+                    <div class="mt-3 alert alert-info">
+                        <i class="fas fa-info-circle"></i> 
+                        Загалом в мережі: <strong>${data.total_quantity} шт.</strong>
+                    </div>
+                `;
+            }
+            
+            document.getElementById('availability-content').innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('availability-content').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> Помилка завантаження даних
+                </div>
+            `;
+        });
+}
+
+// Показати alert
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+
+// Get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

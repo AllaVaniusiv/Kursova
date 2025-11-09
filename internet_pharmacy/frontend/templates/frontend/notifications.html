@@ -1,0 +1,163 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Мої сповіщення - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-bell"></i> Мої сповіщення
+    </h1>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <span class="badge bg-primary" id="total-count">0</span> всього
+                    <span class="badge bg-danger" id="unread-count">0</span> непрочитаних
+                </div>
+                <button class="btn btn-sm btn-outline-primary" onclick="markAllAsRead()">
+                    <i class="fas fa-check-double"></i> Позначити всі як прочитані
+                </button>
+            </div>
+
+            <div id="notifications-container">
+                <div class="text-center">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Завантаження...</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Завантаження сповіщень
+function loadNotifications() {
+    fetch('/api/users/my_notifications/')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-count').textContent = data.notifications.length;
+            document.getElementById('unread-count').textContent = data.unread_count;
+
+            const container = document.getElementById('notifications-container');
+
+            if (data.notifications.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> У вас немає сповіщень
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '<div class="list-group">';
+            data.notifications.forEach(notif => {
+                const icon = getNotificationIcon(notif.type);
+                const date = new Date(notif.created_at).toLocaleString('uk-UA');
+
+                html += `
+                    <div class="list-group-item ${notif.is_read ? '' : 'bg-light border-primary'}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="flex-grow-1">
+                                <h6 class="mb-1">
+                                    ${icon} ${notif.type}
+                                    ${!notif.is_read ? '<span class="badge bg-primary">Нове</span>' : ''}
+                                </h6>
+                                <p class="mb-1">${notif.message}</p>
+                                <small class="text-muted">${date}</small>
+                            </div>
+                            ${!notif.is_read ? `
+                                <button class="btn btn-sm btn-outline-primary" onclick="markAsRead(${notif.id})">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            container.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('notifications-container').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> Помилка завантаження сповіщень
+                </div>
+            `;
+        });
+}
+
+// Іконки для типів сповіщень
+function getNotificationIcon(type) {
+    const icons = {
+        'Замовлення створено': '<i class="fas fa-shopping-cart text-success"></i>',
+        'Замовлення підтверджено': '<i class="fas fa-check-circle text-info"></i>',
+        'Замовлення готове': '<i class="fas fa-box text-success"></i>',
+        'Замовлення доставлено': '<i class="fas fa-truck text-success"></i>',
+        'Нараховано бонуси': '<i class="fas fa-gift text-warning"></i>',
+        'Акція': '<i class="fas fa-tag text-danger"></i>',
+    };
+    return icons[type] || '<i class="fas fa-bell text-primary"></i>';
+}
+
+// Позначити як прочитане
+function markAsRead(notificationId) {
+    fetch('/api/users/mark_notifications_read/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ notification_ids: [notificationId] })
+    })
+    .then(() => {
+        loadNotifications();
+        // Оновлюємо лічильник в навігації
+        if (typeof loadNotificationsCount === 'function') {
+            loadNotificationsCount();
+        }
+    });
+}
+
+// Позначити всі як прочитані
+function markAllAsRead() {
+    fetch('/api/users/mark_notifications_read/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ notification_ids: [] })
+    })
+    .then(() => {
+        loadNotifications();
+        if (typeof loadNotificationsCount === 'function') {
+            loadNotificationsCount();
+        }
+    });
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Завантажуємо при завантаженні сторінки
+document.addEventListener('DOMContentLoaded', loadNotifications);
+</script>
+{% endblock %}

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Інтернет-аптека{% endblock %}</title>
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary-color: #2c7a7b;
+            --secondary-color: #38b2ac;
+            --accent-color: #f56565;
+            --dark: #2d3748;
+            --light: #f7fafc;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--light);
+        }
+
+        .navbar {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .navbar-brand {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: white !important;
+        }
+
+        .navbar-brand i {
+            margin-right: 10px;
+        }
+
+        .nav-link {
+            color: rgba(255,255,255,0.9) !important;
+            transition: color 0.3s;
+        }
+
+        .nav-link:hover {
+            color: white !important;
+        }
+
+        .cart-badge, .notification-badge {
+            background-color: var(--accent-color);
+            border-radius: 50%;
+            padding: 2px 6px;
+            font-size: 0.75rem;
+            margin-left: 5px;
+        }
+
+        .hero {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 60px 0;
+            margin-bottom: 40px;
+        }
+
+        .card {
+            border: none;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary {
+            background: var(--primary-color);
+            border: none;
+            border-radius: 8px;
+            padding: 10px 24px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary:hover {
+            background: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+
+        .medication-card {
+            height: 100%;
+        }
+
+        .medication-image {
+            height: 200px;
+            object-fit: cover;
+            border-radius: 12px 12px 0 0;
+        }
+
+        .price-tag {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: var(--primary-color);
+        }
+
+        .badge-prescription {
+            background-color: var(--accent-color);
+        }
+
+        .badge-available {
+            background-color: #48bb78;
+        }
+
+        .footer {
+            background-color: var(--dark);
+            color: white;
+            padding: 40px 0 20px;
+            margin-top: 60px;
+        }
+
+        .discount-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: var(--accent-color);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .alert-custom {
+            border-radius: 12px;
+            border: none;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{% url 'frontend:index' %}">
+                <i class="fas fa-pills"></i>
+                Інтернет-аптека
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'frontend:medications' %}">
+                            <i class="fas fa-capsules"></i> Каталог
+                        </a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'frontend:pharmacies' %}">
+                            <i class="fas fa-hospital"></i> Аптеки
+                        </a>
+                    </li>
+
+                    {% if user.is_authenticated %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'frontend:cart' %}">
+                                <i class="fas fa-shopping-cart"></i> Кошик
+                                <span class="cart-badge" id="cart-count">0</span>
+                            </a>
+                        </li>
+
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'frontend:orders' %}">
+                                <i class="fas fa-box"></i> Замовлення
+                            </a>
+                        </li>
+
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle" href="#" id="profileDropdown" role="button" data-bs-toggle="dropdown">
+                                <i class="fas fa-user"></i> {{ user.username }}
+                                <span class="badge bg-danger notification-badge" id="notifications-badge" style="display: none;">0</span>
+                            </a>
+                            <ul class="dropdown-menu">
+                                <li><a class="dropdown-item" href="{% url 'frontend:profile' %}">
+                                    <i class="fas fa-id-card"></i> Профіль
+                                </a></li>
+                                <li><a class="dropdown-item" href="/notifications/">
+                                    <i class="fas fa-bell"></i> Сповіщення
+                                    <span class="badge bg-danger" id="notifications-menu-badge" style="display: none;">0</span>
+                                </a></li>
+                                <li><a class="dropdown-item" href="{% url 'frontend:orders' %}">
+                                    <i class="fas fa-box"></i> Мої замовлення
+                                </a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'frontend:logout' %}">
+                                    <i class="fas fa-sign-out-alt"></i> Вийти
+                                </a></li>
+                            </ul>
+                        </li>
+                    {% else %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'login' %}">
+                                <i class="fas fa-sign-in-alt"></i> Увійти
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'frontend:register' %}">
+                                <i class="fas fa-user-plus"></i> Реєстрація
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Messages -->
+    {% if messages %}
+        <div class="container mt-3">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-custom alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5><i class="fas fa-pills"></i> Інтернет-аптека</h5>
+                    <p>Якісні медикаменти з доставкою додому</p>
+                </div>
+                <div class="col-md-4">
+                    <h5>Контакти</h5>
+                    <p>
+                        <i class="fas fa-phone"></i> +380 (32) 123-45-67<br>
+                        <i class="fas fa-envelope"></i> info@pharmacy.com<br>
+                        <i class="fas fa-map-marker-alt"></i> м. Львів, вул. Городоцька, 123
+                    </p>
+                </div>
+                <div class="col-md-4">
+                    <h5>Графік роботи</h5>
+                    <p>
+                        Пн-Пт: 8:00 - 22:00<br>
+                        Сб-Нд: 9:00 - 21:00<br>
+                        Доставка: цілодобово
+                    </p>
+                </div>
+            </div>
+            <hr style="border-color: rgba(255,255,255,0.2);">
+            <div class="text-center">
+                <p>&copy; 2025 Інтернет-аптека. Курсовий проєкт з GoF патернами.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <script>
+        // Завантаження кількості товарів в кошику
+        function loadCartCount() {
+            {% if user.is_authenticated %}
+            fetch('/api/cart/')
+                .then(response => response.json())
+                .then(data => {
+                    const count = data.items_count || 0;
+                    document.getElementById('cart-count').textContent = count;
+                })
+                .catch(error => console.error('Error loading cart:', error));
+            {% endif %}
+        }
+
+        // Завантаження кількості непрочитаних сповіщень
+        function loadNotificationsCount() {
+            {% if user.is_authenticated %}
+            fetch('/api/users/my_notifications/')
+                .then(response => response.json())
+                .then(data => {
+                    const unreadCount = data.unread_count || 0;
+
+                    // Оновлюємо бейдж біля імені
+                    const badge = document.getElementById('notifications-badge');
+                    if (unreadCount > 0) {
+                        badge.textContent = unreadCount;
+                        badge.style.display = 'inline';
+                    } else {
+                        badge.style.display = 'none';
+                    }
+
+                    // Оновлюємо бейдж в меню
+                    const menuBadge = document.getElementById('notifications-menu-badge');
+                    if (unreadCount > 0) {
+                        menuBadge.textContent = unreadCount;
+                        menuBadge.style.display = 'inline';
+                    } else {
+                        menuBadge.style.display = 'none';
+                    }
+                })
+                .catch(error => console.error('Error loading notifications:', error));
+            {% endif %}
+        }
+
+        // Завантажуємо при завантаженні сторінки
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCartCount();
+            loadNotificationsCount();
+
+            // Оновлюємо сповіщення кожні 30 секунд
+            {% if user.is_authenticated %}
+            setInterval(loadNotificationsCount, 30000);
+            {% endif %}
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

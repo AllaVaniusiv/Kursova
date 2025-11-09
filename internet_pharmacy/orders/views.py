@@ -162,6 +162,36 @@ class OrderViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(order)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'])
+    def repeat_order(self, request, pk=None):
+
+        original_order = self.get_object()
+
+        # Перевіряємо, чи є товари в наявності
+        unavailable_items = []
+        for item in original_order.items.all():
+            if not item.medication.is_available or not item.medication.is_in_stock():
+                unavailable_items.append(item.medication.name)
+
+        if unavailable_items:
+            return Response({
+                'success': False,
+                'message': f'Деякі товари недоступні: {", ".join(unavailable_items)}',
+                'unavailable_items': unavailable_items
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Додаємо товари з оригінального замовлення в кошик
+        cart, created = ShoppingCart.objects.get_or_create(user=request.user)
+
+        for item in original_order.items.all():
+            cart.add_item(item.medication, item.quantity)
+
+        return Response({
+            'success': True,
+            'message': f'Товари з замовлення #{original_order.id} додано в кошик',
+            'cart_items_count': cart.get_items_count()
+        })
+
     @action(detail=False, methods=['get'])
     def my_orders(self, request):
         """
@@ -322,3 +352,36 @@ class ShoppingCartViewSet(viewsets.ViewSet):
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
+
+    @action(detail=True, methods=['post'])
+    def repeat_order(self, request, pk=None):
+        """
+        Повторити замовлення
+        POST /api/orders/{id}/repeat_order/
+        """
+        original_order = self.get_object()
+
+        # Перевіряємо, чи є товари в наявності
+        unavailable_items = []
+        for item in original_order.items.all():
+            if not item.medication.is_available or not item.medication.is_in_stock():
+                unavailable_items.append(item.medication.name)
+
+        if unavailable_items:
+            return Response({
+                'success': False,
+                'message': f'Деякі товари недоступні: {", ".join(unavailable_items)}',
+                'unavailable_items': unavailable_items
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Додаємо товари з оригінального замовлення в кошик
+        cart, created = ShoppingCart.objects.get_or_create(user=request.user)
+
+        for item in original_order.items.all():
+            cart.add_item(item.medication, item.quantity)
+
+        return Response({
+            'success': True,
+            'message': f'Товари з замовлення #{original_order.id} додано в кошик',
+            'cart_items_count': cart.get_items_count()
+        })

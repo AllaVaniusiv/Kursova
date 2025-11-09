@@ -1,0 +1,406 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Кошик - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-shopping-cart"></i> Кошик
+    </h1>
+    
+    <!-- Loading -->
+    <div id="loading" class="text-center mb-4" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Завантаження...</span>
+        </div>
+    </div>
+    
+    <div class="row" id="cart-content">
+        <!-- Cart items will be loaded here -->
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let cartData = null;
+
+// Завантаження кошика
+function loadCart() {
+    document.getElementById('loading').style.display = 'block';
+    
+    fetch('/api/cart/')
+        .then(response => response.json())
+        .then(data => {
+            cartData = data;
+            document.getElementById('loading').style.display = 'none';
+            renderCart(data);
+        })
+        .catch(error => {
+            console.error('Error loading cart:', error);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('cart-content').innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> Помилка завантаження кошика
+                    </div>
+                </div>
+            `;
+        });
+}
+
+// Відобразити кошик
+function renderCart(data) {
+    const container = document.getElementById('cart-content');
+    
+    if (!data.items || data.items.length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="fas fa-shopping-cart fa-3x text-muted mb-3"></i>
+                        <h4>Кошик порожній</h4>
+                        <p class="text-muted">Додайте товари з каталогу</p>
+                        <a href="{% url 'frontend:medications' %}" class="btn btn-primary">
+                            <i class="fas fa-capsules"></i> Перейти до каталогу
+                        </a>
+                    </div>
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title mb-4">Товари в кошику (${data.items_count})</h5>
+                    <div id="cart-items">
+                        ${data.items.map(item => renderCartItem(item)).join('')}
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mt-4">
+                        <button class="btn btn-outline-danger" onclick="clearCart()">
+                            <i class="fas fa-trash"></i> Очистити кошик
+                        </button>
+                        <a href="{% url 'frontend:medications' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-arrow-left"></i> Продовжити покупки
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Підсумок</h5>
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Товарів:</span>
+                        <span>${data.items_count}</span>
+                    </div>
+                    
+                    <div class="d-flex justify-content-between mb-3">
+                        <span><strong>Сума:</strong></span>
+                        <span><strong>${data.total_price} грн</strong></span>
+                    </div>
+                    
+                    <hr>
+                    
+                    <button class="btn btn-success btn-lg w-100 mb-2" onclick="showCheckoutModal()">
+                        <i class="fas fa-check"></i> Оформити замовлення
+                    </button>
+                    
+                    <div class="alert alert-info small mb-0">
+                        <i class="fas fa-info-circle"></i> 
+                        Ваша знижка: <strong>${getUserDiscount()}%</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Відобразити товар
+function renderCartItem(item) {
+    return `
+        <div class="cart-item mb-3 p-3 border rounded" data-item-id="${item.id}">
+            <div class="row align-items-center">
+                <div class="col-md-2">
+                    ${item.medication.image ? 
+                        `<img src="${item.medication.image}" class="img-fluid rounded" alt="${item.medication.name}">` :
+                        '<div class="bg-light p-3 rounded text-center"><i class="fas fa-pills fa-2x text-muted"></i></div>'
+                    }
+                </div>
+                <div class="col-md-5">
+                    <h6 class="mb-1">${item.medication.name}</h6>
+                    <p class="text-muted small mb-0">${item.medication.manufacturer}</p>
+                    <p class="text-muted small mb-0">${item.medication.price} грн</p>
+                </div>
+                <div class="col-md-3">
+                    <div class="input-group input-group-sm">
+                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${item.medication.id}, ${item.quantity - 1})">
+                            <i class="fas fa-minus"></i>
+                        </button>
+                        <input type="text" class="form-control text-center" value="${item.quantity}" readonly>
+                        <button class="btn btn-outline-secondary" onclick="updateQuantity(${item.medication.id}, ${item.quantity + 1})">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="col-md-2 text-end">
+                    <p class="mb-2"><strong>${item.total_price} грн</strong></p>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeItem(${item.medication.id}, '${item.medication.name}')">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Видалити товар
+function removeItem(medicationId, medicationName) {
+    if (!confirm(`Видалити "${medicationName}" з кошика?`)) return;
+    
+    const formData = new FormData();
+    formData.append('medication_id', medicationId);
+    
+    fetch('/api/cart/remove_item/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        showAlert('success', 'Товар видалено з кошика');
+        loadCart();
+        document.getElementById('cart-count').textContent = data.items_count || 0;
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Помилка видалення товару');
+    });
+}
+
+// Очистити кошик
+function clearCart() {
+    if (!confirm('Очистити весь кошик?')) return;
+    
+    fetch('/api/cart/clear/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(() => {
+        showAlert('success', 'Кошик очищено');
+        loadCart();
+        document.getElementById('cart-count').textContent = '0';
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Помилка очищення кошика');
+    });
+}
+
+// Показати модальне вікно оформлення
+function showCheckoutModal() {
+    // Створюємо модальне вікно
+    const modal = `
+        <div class="modal fade" id="checkoutModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-check-circle"></i> Оформлення замовлення
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="checkout-form">
+                            <div class="mb-3">
+                                <label class="form-label">Тип замовлення *</label>
+                                <select class="form-select" id="order-type" required onchange="toggleDeliveryFields()">
+                                    <option value="">Оберіть...</option>
+                                    <option value="delivery">Доставка кур'єром</option>
+                                    <option value="pickup">Самовивіз з аптеки</option>
+                                </select>
+                            </div>
+                            
+                            <div id="pharmacy-field" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Оберіть аптеку *</label>
+                                    <select class="form-select" id="pharmacy-select">
+                                        <option value="">Завантаження...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div id="delivery-address-field" style="display: none;">
+                                <div class="mb-3">
+                                    <label class="form-label">Адреса доставки *</label>
+                                    <input type="text" class="form-control" id="delivery-address" placeholder="вул. Шевченка, 10, кв. 5">
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Спосіб оплати *</label>
+                                <select class="form-select" id="payment-method" required>
+                                    <option value="">Оберіть...</option>
+                                    <option value="card">Картка онлайн</option>
+                                    <option value="cash">Готівка при отриманні</option>
+                                </select>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Скасувати</button>
+                        <button type="button" class="btn btn-success" onclick="checkout()">
+                            <i class="fas fa-check"></i> Оформити замовлення
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modal);
+    const modalElement = new bootstrap.Modal(document.getElementById('checkoutModal'));
+    modalElement.show();
+    
+    // Завантажуємо список аптек
+    loadPharmacies();
+}
+
+// Завантажити список аптек
+function loadPharmacies() {
+    fetch('/api/pharmacies/')
+        .then(response => response.json())
+        .then(data => {
+            const select = document.getElementById('pharmacy-select');
+            select.innerHTML = '<option value="">Оберіть аптеку...</option>';
+            
+            data.results.forEach(pharmacy => {
+                select.innerHTML += `
+                    <option value="${pharmacy.id}">
+                        ${pharmacy.name} - ${pharmacy.address}
+                    </option>
+                `;
+            });
+        });
+}
+
+// Переключити поля залежно від типу замовлення
+function toggleDeliveryFields() {
+    const orderType = document.getElementById('order-type').value;
+    
+    if (orderType === 'delivery') {
+        document.getElementById('delivery-address-field').style.display = 'block';
+        document.getElementById('pharmacy-field').style.display = 'block';
+    } else if (orderType === 'pickup') {
+        document.getElementById('delivery-address-field').style.display = 'none';
+        document.getElementById('pharmacy-field').style.display = 'block';
+    }
+}
+
+// Оформити замовлення (використовує Builder pattern на бекенді)
+function checkout() {
+    const orderType = document.getElementById('order-type').value;
+    const pharmacyId = document.getElementById('pharmacy-select').value;
+    const deliveryAddress = document.getElementById('delivery-address').value;
+    const paymentMethod = document.getElementById('payment-method').value;
+    
+    if (!orderType || !paymentMethod) {
+        showAlert('warning', 'Заповніть всі обов\'язкові поля');
+        return;
+    }
+    
+    if (orderType === 'pickup' && !pharmacyId) {
+        showAlert('warning', 'Оберіть аптеку для самовивозу');
+        return;
+    }
+    
+    if (orderType === 'delivery' && !deliveryAddress) {
+        showAlert('warning', 'Вкажіть адресу доставки');
+        return;
+    }
+    
+    const data = {
+        order_type: orderType,
+        pharmacy_id: pharmacyId ? parseInt(pharmacyId) : null,
+        delivery_address: deliveryAddress,
+        payment_method: paymentMethod
+    };
+    
+    fetch('/api/cart/checkout/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.id) {
+            bootstrap.Modal.getInstance(document.getElementById('checkoutModal')).hide();
+            showAlert('success', 'Замовлення успішно оформлено!');
+            setTimeout(() => {
+                window.location.href = `/orders/${data.id}/`;
+            }, 1500);
+        } else {
+            showAlert('danger', data.error || 'Помилка оформлення замовлення');
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Помилка оформлення замовлення');
+    });
+}
+
+// Допоміжні функції
+function getUserDiscount() {
+    {% if user.is_authenticated %}
+        return {{ user.get_discount }};
+    {% else %}
+        return 0;
+    {% endif %}
+}
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Завантажуємо кошик при завантаженні сторінки
+document.addEventListener('DOMContentLoaded', loadCart);
+</script>
+{% endblock %}
