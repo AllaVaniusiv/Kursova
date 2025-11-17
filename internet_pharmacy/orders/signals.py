@@ -17,7 +17,6 @@ def store_old_status(sender, instance, **kwargs):
         instance._old_status = None
 
 
-# Надсилаємо сповіщення після збереження
 @receiver(post_save, sender=Order)
 def send_status_notification(sender, instance, created, **kwargs):
     """Надсилає сповіщення при зміні статусу замовлення"""
@@ -31,8 +30,12 @@ def send_status_notification(sender, instance, created, **kwargs):
 
     # Якщо статус змінився
     old_status = getattr(instance, '_old_status', None)
+
     if old_status and old_status != instance.status:
         from notifications.models import notify_order_status_changed
         notify_order_status_changed(instance, instance.status)
         print(
             f"✉️ Відправлено сповіщення про зміну статусу замовлення #{instance.id}: {old_status} → {instance.status}")
+
+
+

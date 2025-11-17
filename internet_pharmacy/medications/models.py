@@ -3,9 +3,7 @@ from django.core.validators import MinValueValidator
 
 
 class Medication(models.Model):
-    """
-    Модель медикаменту
-    """
+
     CATEGORY_CHOICES = [
         ('analgesic', 'Знеболююче'),
         ('antibiotic', 'Антибіотик'),
@@ -111,10 +109,6 @@ class Medication(models.Model):
 
 
 class MedicationCatalogManager:
-    """
-    Singleton pattern - єдина точка доступу до каталогу медикаментів
-    Гарантує, що існує тільки один екземпляр каталогу
-    """
     _instance = None
     _medications = None
 
@@ -128,8 +122,6 @@ class MedicationCatalogManager:
         if self._initialized:
             return
         self._initialized = True
-        # НЕ завантажуємо дані під час ініціалізації
-        # Дані завантажаться при першому звертанні
 
     def _load_medications(self):
         """Завантажує всі медикаменти з БД"""
@@ -142,9 +134,6 @@ class MedicationCatalogManager:
         return self._medications
 
     def search_medications(self, query=None, category=None, is_prescription=None):
-        """
-        Пошук медикаментів за критеріями
-        """
         medications = Medication.objects.all()
 
         if query:

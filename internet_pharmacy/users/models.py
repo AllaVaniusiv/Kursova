@@ -3,10 +3,6 @@ from django.db import models
 
 
 class User(AbstractUser):
-    """
-    Розширена модель користувача
-    Реалізує Observer патерн - може отримувати сповіщення
-    """
     CARD_TYPES = [
         ('standard', 'Стандартна'),
         ('premium', 'Преміум'),

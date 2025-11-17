@@ -36,18 +36,6 @@ class OrderViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         """
         Створення замовлення через Builder Pattern
-        POST /api/orders/
-        {
-            "order_type": "delivery",
-            "pharmacy_id": 1,
-            "items": [
-                {"medication_id": 1, "quantity": 2},
-                {"medication_id": 3, "quantity": 1}
-            ],
-            "delivery_address": "вул. Шевченка, 10",
-            "payment_method": "card",
-            "comment": "Доставити до 18:00"
-        }
         """
         serializer = OrderCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -80,12 +68,10 @@ class OrderViewSet(viewsets.ModelViewSet):
             if data.get('comment'):
                 builder.set_comment(data['comment'])
 
-            # Створюємо замовлення
+            # Створюємо замовлення (сигнал автоматично надішле сповіщення)
             order = builder.build()
 
-            # Надсилаємо сповіщення
-            from notifications.models import notify_order_created
-            notify_order_created(order)
+            # ❌ ВИДАЛЕНО: notify_order_created(order) - бо вже викликається в сигналі!
 
             # Повертаємо результат
             response_serializer = OrderSerializer(order)
@@ -114,7 +100,6 @@ class OrderViewSet(viewsets.ModelViewSet):
     def cancel(self, request, pk=None):
         """
         Скасування замовлення
-        POST /api/orders/{id}/cancel/
         """
         order = self.get_object()
 
@@ -134,8 +119,6 @@ class OrderViewSet(viewsets.ModelViewSet):
     def update_status(self, request, pk=None):
         """
         Зміна статусу замовлення (тільки для адмінів)
-        POST /api/orders/{id}/update_status/
-        {"status": "confirmed"}
         """
         if not request.user.is_staff:
             return Response(
@@ -155,19 +138,15 @@ class OrderViewSet(viewsets.ModelViewSet):
         order.status = new_status
         order.save()
 
-        # Надсилаємо сповіщення про зміну статусу
-        from notifications.models import notify_order_status_changed
-        notify_order_status_changed(order, new_status)
-
         serializer = self.get_serializer(order)
         return Response(serializer.data)
 
     @action(detail=True, methods=['post'])
     def repeat_order(self, request, pk=None):
-
+        """Повторити замовлення"""
         original_order = self.get_object()
 
-        # Перевіряємо, чи є товари в наявності
+        # Перевіряємо наявність
         unavailable_items = []
         for item in original_order.items.all():
             if not item.medication.is_available or not item.medication.is_in_stock():
@@ -180,7 +159,7 @@ class OrderViewSet(viewsets.ModelViewSet):
                 'unavailable_items': unavailable_items
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # Додаємо товари з оригінального замовлення в кошик
+        # Додаємо в кошик
         cart, created = ShoppingCart.objects.get_or_create(user=request.user)
 
         for item in original_order.items.all():
@@ -194,37 +173,25 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def my_orders(self, request):
-        """
-        Мої замовлення
-        GET /api/orders/my_orders/
-        """
+        """Мої замовлення"""
         orders = Order.objects.filter(user=request.user).order_by('-created_at')
         serializer = self.get_serializer(orders, many=True)
         return Response(serializer.data)
 
 
 class ShoppingCartViewSet(viewsets.ViewSet):
-    """
-    API для кошика покупок
-    """
+    """API для кошика покупок"""
     permission_classes = [IsAuthenticated]
 
     def list(self, request):
-        """
-        Отримати кошик
-        GET /api/cart/
-        """
+        """Отримати кошик"""
         cart, created = ShoppingCart.objects.get_or_create(user=request.user)
         serializer = ShoppingCartSerializer(cart)
         return Response(serializer.data)
 
     @action(detail=False, methods=['post'])
     def add_item(self, request):
-        """
-        Додати товар в кошик
-        POST /api/cart/add_item/
-        {"medication_id": 1, "quantity": 2}
-        """
+        """Додати товар в кошик"""
         serializer = CartItemAddSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -247,11 +214,7 @@ class ShoppingCartViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def remove_item(self, request):
-        """
-        Видалити товар з кошика
-        POST /api/cart/remove_item/
-        {"medication_id": 1}
-        """
+        """Видалити товар з кошика"""
         medication_id = request.data.get('medication_id')
 
         if not medication_id:
@@ -281,10 +244,7 @@ class ShoppingCartViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def clear(self, request):
-        """
-        Очистити кошик
-        POST /api/cart/clear/
-        """
+        """Очистити кошик"""
         try:
             cart = ShoppingCart.objects.get(user=request.user)
             cart.clear()
@@ -300,16 +260,7 @@ class ShoppingCartViewSet(viewsets.ViewSet):
 
     @action(detail=False, methods=['post'])
     def checkout(self, request):
-        """
-        Оформлення замовлення з кошика
-        POST /api/cart/checkout/
-        {
-            "order_type": "delivery",
-            "pharmacy_id": 1,
-            "delivery_address": "вул. Шевченка, 10",
-            "payment_method": "card"
-        }
-        """
+        """Оформлення замовлення з кошика"""
         serializer = CheckoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -330,10 +281,6 @@ class ShoppingCartViewSet(viewsets.ViewSet):
                 payment_method=data.get('payment_method')
             )
 
-            # Надсилаємо сповіщення
-            from notifications.models import notify_order_created
-            notify_order_created(order)
-
             order_serializer = OrderSerializer(order)
             return Response(order_serializer.data, status=status.HTTP_201_CREATED)
 
@@ -352,36 +299,3 @@ class ShoppingCartViewSet(viewsets.ViewSet):
                 {'error': str(e)},
                 status=status.HTTP_400_BAD_REQUEST
             )
-
-    @action(detail=True, methods=['post'])
-    def repeat_order(self, request, pk=None):
-        """
-        Повторити замовлення
-        POST /api/orders/{id}/repeat_order/
-        """
-        original_order = self.get_object()
-
-        # Перевіряємо, чи є товари в наявності
-        unavailable_items = []
-        for item in original_order.items.all():
-            if not item.medication.is_available or not item.medication.is_in_stock():
-                unavailable_items.append(item.medication.name)
-
-        if unavailable_items:
-            return Response({
-                'success': False,
-                'message': f'Деякі товари недоступні: {", ".join(unavailable_items)}',
-                'unavailable_items': unavailable_items
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        # Додаємо товари з оригінального замовлення в кошик
-        cart, created = ShoppingCart.objects.get_or_create(user=request.user)
-
-        for item in original_order.items.all():
-            cart.add_item(item.medication, item.quantity)
-
-        return Response({
-            'success': True,
-            'message': f'Товари з замовлення #{original_order.id} додано в кошик',
-            'cart_items_count': cart.get_items_count()
-        })

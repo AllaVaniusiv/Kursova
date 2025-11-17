@@ -5,9 +5,6 @@ from abc import ABC, abstractmethod
 
 
 class Order(models.Model):
-    """
-    Базова модель замовлення
-    """
     ORDER_STATUS = [
         ('pending', 'Очікує обробки'),
         ('confirmed', 'Підтверджено'),
@@ -131,6 +128,7 @@ class Order(models.Model):
     def __str__(self):
         return f"Замовлення #{self.id} - {self.user.username}"
 
+
     def calculate_total(self):
         """Розраховує загальну суму замовлення"""
         # Підсумок товарів
@@ -145,7 +143,13 @@ class Order(models.Model):
 
         # Загальна сума
         self.total_price = self.subtotal - self.discount_amount + self.delivery_cost
-        self.save()
+
+        # Зберігаємо тільки ці поля, щоб НЕ тригерити сигнал created=True
+        Order.objects.filter(pk=self.pk).update(
+            subtotal=self.subtotal,
+            discount_amount=self.discount_amount,
+            total_price=self.total_price
+        )
 
     def add_bonus_points(self):
         """Нараховує бонусні бали користувачу"""
@@ -190,21 +194,12 @@ class OrderItem(models.Model):
     def __str__(self):
         return f"{self.medication.name} x {self.quantity}"
 
-    # def get_total_price(self):
-    #     """Повертає загальну ціну за товар"""
-    #     return self.price * self.quantity
-
     def get_total_price(self):
         """Повертає загальну ціну за товар"""
         if self.price is None:
             return 0
         return self.price * self.quantity
 
-    # def save(self, *args, **kwargs):
-    #     # Зберігаємо ціну на момент замовлення
-    #     if not self.price:
-    #         self.price = self.medication.price
-    #     super().save(*args, **kwargs)
     def save(self, *args, **kwargs):
         # Зберігаємо ціну на момент замовлення
         if self.price is None and self.medication:
@@ -212,13 +207,7 @@ class OrderItem(models.Model):
         super().save(*args, **kwargs)
 
 
-# ============= FACTORY METHOD PATTERN =============
-
 class OrderFactory(ABC):
-    """
-    Абстрактна фабрика для створення замовлень
-    Factory Method Pattern
-    """
 
     @abstractmethod
     def create_order(self, user, pharmacy=None):
@@ -233,10 +222,6 @@ class OrderFactory(ABC):
 
 
 class DeliveryOrderFactory(OrderFactory):
-    """
-    Фабрика для створення замовлень з доставкою
-    """
-
     def create_order(self, user, pharmacy=None):
         order = Order(
             order_type='delivery',
@@ -249,9 +234,6 @@ class DeliveryOrderFactory(OrderFactory):
 
 
 class PickupOrderFactory(OrderFactory):
-    """
-    Фабрика для створення замовлень з самовивозом
-    """
 
     def create_order(self, user, pharmacy=None):
         if not pharmacy:
@@ -268,9 +250,7 @@ class PickupOrderFactory(OrderFactory):
 
 
 def get_order_factory(order_type):
-    """
-    Повертає відповідну фабрику залежно від типу замовлення
-    """
+
     factories = {
         'delivery': DeliveryOrderFactory(),
         'pickup': PickupOrderFactory(),
@@ -278,13 +258,7 @@ def get_order_factory(order_type):
     return factories.get(order_type)
 
 
-# ============= BUILDER PATTERN =============
-
 class OrderBuilder:
-    """
-    Будівельник для покрокового створення замовлення
-    Builder Pattern
-    """
 
     def __init__(self, user):
         self.user = user

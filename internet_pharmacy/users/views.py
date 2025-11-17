@@ -12,14 +12,10 @@ from .serializers import (
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    """
-    API для користувачів
-    """
     queryset = User.objects.all()
     serializer_class = UserSerializer
 
     def get_permissions(self):
-        """Реєстрація доступна всім, інше тільки для авторизованих"""
         if self.action == 'create':
             permission_classes = [AllowAny]
         else:
@@ -38,15 +34,6 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Реєстрація нового користувача
         POST /api/users/
-        {
-            "username": "new_user",
-            "email": "user@example.com",
-            "password": "password123",
-            "password_confirm": "password123",
-            "first_name": "Іван",
-            "last_name": "Петров",
-            "phone": "+380671234567"
-        }
         """
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -74,12 +61,6 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Оновити профіль поточного користувача
         PUT/PATCH /api/users/update_profile/
-        {
-            "first_name": "Іван",
-            "last_name": "Петров",
-            "phone": "+380671234567",
-            "email_notifications": true
-        }
         """
         partial = request.method == 'PATCH'
         serializer = UserProfileSerializer(
@@ -114,28 +95,31 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Сповіщення поточного користувача
         GET /api/users/my_notifications/
+
+        Показуємо тільки push-сповіщення (щоб уникнути дублювання)
         """
         from notifications.models import Notification
+        from notifications.serializers import NotificationSerializer
 
+        # Беремо тільки push-сповіщення (вони зберігаються в БД як основні)
         notifications = Notification.objects.filter(
-            user=request.user
+            user=request.user,
+            channel='push'
         ).order_by('-created_at')[:20]
 
-        unread_count = notifications.filter(is_read=False).count()
+        # Підраховуємо непрочитані push-сповіщення
+        unread_count = Notification.objects.filter(
+            user=request.user,
+            is_read=False,
+            channel='push'
+        ).count()
 
-        notifications_data = []
-        for notif in notifications:
-            notifications_data.append({
-                'id': notif.id,
-                'type': notif.get_notification_type_display(),
-                'message': notif.message,
-                'is_read': notif.is_read,
-                'created_at': notif.created_at
-            })
+        # Серіалізуємо дані
+        serializer = NotificationSerializer(notifications, many=True)
 
         return Response({
             'unread_count': unread_count,
-            'notifications': notifications_data
+            'notifications': serializer.data
         })
 
     @action(detail=False, methods=['post'])
@@ -143,25 +127,31 @@ class UserViewSet(viewsets.ModelViewSet):
         """
         Позначити сповіщення як прочитані
         POST /api/users/mark_notifications_read/
-        {"notification_ids": [1, 2, 3]}
+        {"notification_ids": [1, 2, 3]}  або {"notification_ids": []} для всіх
         """
         from notifications.models import Notification
 
         notification_ids = request.data.get('notification_ids', [])
 
         if notification_ids:
-            Notification.objects.filter(
+            # Позначити конкретні push-сповіщення
+            updated = Notification.objects.filter(
                 id__in=notification_ids,
-                user=request.user
+                user=request.user,
+                channel='push'
             ).update(is_read=True)
         else:
-            # Позначити всі як прочитані
-            Notification.objects.filter(
+            # Позначити всі непрочитані push-сповіщення як прочитані
+            updated = Notification.objects.filter(
                 user=request.user,
-                is_read=False
+                is_read=False,
+                channel='push'
             ).update(is_read=True)
 
-        return Response({'message': 'Сповіщення позначені як прочитані'})
+        return Response({
+            'message': 'Сповіщення позначені як прочитані',
+            'updated_count': updated
+        })
 
     @action(detail=False, methods=['get'])
     def bonus_info(self, request):

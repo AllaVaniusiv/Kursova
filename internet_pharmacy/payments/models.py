@@ -5,13 +5,7 @@ import random
 import string
 
 
-# ============= STRATEGY PATTERN для оплати =============
-
 class PaymentStrategy(ABC):
-    """
-    Абстрактна стратегія оплати
-    Strategy Pattern - дозволяє обирати алгоритм оплати в runtime
-    """
 
     @abstractmethod
     def pay(self, amount):
@@ -30,9 +24,6 @@ class PaymentStrategy(ABC):
 
 
 class CardPaymentStrategy(PaymentStrategy):
-    """
-    Стратегія оплати карткою
-    """
 
     def __init__(self, card_number, card_holder, cvv, expiry_date):
         self.card_number = card_number
@@ -169,8 +160,6 @@ class OnlinePaymentStrategy(PaymentStrategy):
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=16))
 
 
-# ============= STRATEGY PATTERN для доставки =============
-
 class DeliveryStrategy(ABC):
     """
     Абстрактна стратегія доставки
@@ -193,9 +182,6 @@ class DeliveryStrategy(ABC):
 
 
 class CourierDeliveryStrategy(DeliveryStrategy):
-    """
-    Стратегія доставки кур'єром
-    """
 
     def __init__(self, address, delivery_time=None):
         self.address = address
@@ -232,9 +218,7 @@ class CourierDeliveryStrategy(DeliveryStrategy):
 
 
 class ExpressDeliveryStrategy(DeliveryStrategy):
-    """
-    Стратегія експрес-доставки
-    """
+
 
     def __init__(self, address):
         self.address = address
@@ -293,12 +277,8 @@ class SelfPickupStrategy(DeliveryStrategy):
         return '30 хвилин'
 
 
-# ============= Моделі для зберігання платежів =============
-
 class Payment(models.Model):
-    """
-    Модель платежу
-    """
+
     PAYMENT_METHODS = [
         ('card', 'Банківська картка'),
         ('cash', 'Готівка'),

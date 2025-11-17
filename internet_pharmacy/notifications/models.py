@@ -1,17 +1,9 @@
 from django.db import models
 from abc import ABC, abstractmethod
-from django.core.mail import send_mail
-from django.conf import settings
 from typing import List
 
 
-# ============= OBSERVER PATTERN =============
-
 class Observer(ABC):
-    """
-    Абстрактний Observer (спостерігач)
-    Observer Pattern - дозволяє об'єктам отримувати сповіщення про зміни
-    """
 
     @abstractmethod
     def update(self, message, notification_type=None):
@@ -25,9 +17,6 @@ class Observer(ABC):
 
 
 class EmailObserver(Observer):
-    """
-    Спостерігач для email сповіщень
-    """
 
     def __init__(self, user):
         self.user = user
@@ -40,21 +29,12 @@ class EmailObserver(Observer):
         subject = self._get_subject(notification_type)
 
         try:
-            # В реальному проекті тут буде send_mail
-            # send_mail(subject, message, settings.DEFAULT_FROM_EMAIL, [self.user.email])
 
             # Імітація надсилання
             print(f"📧 Email to {self.user.email}: {subject}")
             print(f"   {message}")
 
-            # Зберігаємо в БД
-            Notification.objects.create(
-                user=self.user,
-                notification_type=notification_type or 'info',
-                channel='email',
-                message=message,
-                is_sent=True
-            )
+            # НЕ зберігаємо в БД окремо для email
             return True
         except Exception as e:
             print(f"Error sending email: {e}")
@@ -98,14 +78,7 @@ class SMSObserver(Observer):
             # Імітація надсилання
             print(f"📱 SMS to {self.user.phone}: {message[:50]}...")
 
-            # Зберігаємо в БД
-            Notification.objects.create(
-                user=self.user,
-                notification_type=notification_type or 'info',
-                channel='sms',
-                message=message,
-                is_sent=True
-            )
+            # НЕ зберігаємо в БД окремо для SMS
             return True
         except Exception as e:
             print(f"Error sending SMS: {e}")
@@ -130,7 +103,7 @@ class PushObserver(Observer):
             # В реальному проекті тут буде Firebase Cloud Messaging
             print(f"🔔 Push to {self.user.username}: {message}")
 
-            # Зберігаємо в БД
+            # Зберігаємо в БД ТІЛЬКИ push (основне сповіщення для UI)
             Notification.objects.create(
                 user=self.user,
                 notification_type=notification_type or 'info',
@@ -149,10 +122,6 @@ class PushObserver(Observer):
 
 
 class NotificationService:
-    """
-    Сервіс сповіщень (Subject в Observer pattern)
-    Керує списком спостерігачів та надсилає їм повідомлення
-    """
 
     def __init__(self):
         self._observers: List[Observer] = []
@@ -372,21 +341,13 @@ class NotificationTemplate(models.Model):
 
 def notify_order_created(order):
     """Сповіщення про створення замовлення"""
-    message = f"""
-    Дякуємо за замовлення!
-
-    Номер замовлення: #{order.id}
-    Загальна сума: {order.total_price} грн
-    Статус: {order.get_status_display()}
-
-    Ми повідомимо вас про зміну статусу замовлення.
-    """
+    message = f"Дякуємо за замовлення! Номер замовлення: #{order.id}. Ми повідомимо вас про зміну статусу замовлення."
 
     notification_service.notify_user(
         user=order.user,
-        message=message.strip(),
+        message=message,
         notification_type='order_created',
-        channels=['email', 'push']
+        channels=['push']  # Тільки push для UI
     )
 
 
@@ -397,14 +358,25 @@ def notify_order_status_changed(order, new_status):
         'ready': f'Ваше замовлення #{order.id} готове до видачі!',
         'in_delivery': f'Ваше замовлення #{order.id} передано кур\'єру.',
         'completed': f'Ваше замовлення #{order.id} успішно доставлено. Дякуємо!',
+        'cancelled': f'Ваше замовлення #{order.id} скасовано.',
     }
 
     message = status_messages.get(new_status, f'Статус замовлення #{order.id} змінено.')
 
+    # Визначаємо тип сповіщення залежно від статусу
+    notification_type_map = {
+        'confirmed': 'order_confirmed',
+        'ready': 'order_ready',
+        'in_delivery': 'order_ready',
+        'completed': 'order_delivered',
+        'cancelled': 'order_cancelled',
+    }
+    notification_type = notification_type_map.get(new_status, 'info')
+
     notification_service.notify_user(
         user=order.user,
         message=message,
-        notification_type='order_confirmed' if new_status == 'confirmed' else 'info',
+        notification_type=notification_type,
         channels=['email', 'sms', 'push']
     )
 
