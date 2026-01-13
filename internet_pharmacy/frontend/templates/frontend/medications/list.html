@@ -1,0 +1,408 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Каталог медикаментів - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-capsules"></i> Каталог медикаментів
+    </h1>
+    
+    <!-- Filters -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title"><i class="fas fa-filter"></i> Фільтри</h5>
+                    <div class="row">
+                        <!-- Search -->
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">Пошук</label>
+                            <input type="text" class="form-control" id="search-input" placeholder="Назва, виробник...">
+                        </div>
+                        
+                        <!-- Category -->
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Категорія</label>
+                            <select class="form-select" id="category-filter">
+                                <option value="">Всі категорії</option>
+                                <option value="analgesic">Знеболююче</option>
+                                <option value="antibiotic">Антибіотик</option>
+                                <option value="vitamin">Вітаміни</option>
+                                <option value="antiseptic">Антисептик</option>
+                                <option value="cardiovascular">Серцево-судинні</option>
+                                <option value="gastrointestinal">Шлунково-кишкові</option>
+                                <option value="dermatological">Дерматологічні</option>
+                                <option value="other">Інше</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Prescription -->
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Рецептурність</label>
+                            <select class="form-select" id="prescription-filter">
+                                <option value="">Всі</option>
+                                <option value="false">Без рецепта</option>
+                                <option value="true">За рецептом</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Availability -->
+                        <div class="col-md-2 mb-3">
+                            <label class="form-label">Наявність</label>
+                            <select class="form-select" id="availability-filter">
+                                <option value="">Всі</option>
+                                <option value="true">В наявності</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Price Range -->
+                    <div class="row">
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Ціна від (грн)</label>
+                            <input type="number" class="form-control" id="price-min" placeholder="0" min="0" step="10">
+                        </div>
+                        <div class="col-md-3 mb-3">
+                            <label class="form-label">Ціна до (грн)</label>
+                            <input type="number" class="form-control" id="price-max" placeholder="1000" min="0" step="10">
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">Сортування</label>
+                            <div class="d-flex align-items-center">
+                                <div class="form-check me-3">
+                                    <input class="form-check-input" type="checkbox" id="price-sort-asc">
+                                    <label class="form-check-label" for="price-sort-asc">
+                                        <i class="fas fa-sort-amount-down"></i> Дешевші спочатку
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="price-sort-desc">
+                                    <label class="form-check-label" for="price-sort-desc">
+                                        <i class="fas fa-sort-amount-up"></i> Дорожчі спочатку
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <button class="btn btn-primary" onclick="applyFilters()">
+                                <i class="fas fa-search"></i> Застосувати
+                            </button>
+                            <button class="btn btn-secondary" onclick="resetFilters()">
+                                <i class="fas fa-redo"></i> Скинути
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading -->
+    <div id="loading" class="text-center mb-4" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Завантаження...</span>
+        </div>
+    </div>
+
+    <!-- Results count -->
+    <div class="mb-3">
+        <h5 id="results-count">Завантаження...</h5>
+    </div>
+
+    <!-- Medications Grid -->
+    <div class="row" id="medications-grid">
+        <!-- Medications will be loaded here -->
+    </div>
+
+    <!-- Pagination -->
+    <nav aria-label="Pagination" id="pagination-container" class="mt-4">
+        <!-- Pagination will be loaded here -->
+    </nav>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPage = 1;
+
+// Завантаження медикаментів
+function loadMedications(page = 1) {
+    document.getElementById('loading').style.display = 'block';
+    document.getElementById('medications-grid').innerHTML = '';
+
+    // Збираємо фільтри
+    const search = document.getElementById('search-input').value;
+    const category = document.getElementById('category-filter').value;
+    const prescription = document.getElementById('prescription-filter').value;
+    const availability = document.getElementById('availability-filter').value;
+    const priceMin = document.getElementById('price-min').value;
+    const priceMax = document.getElementById('price-max').value;
+    const sortAsc = document.getElementById('price-sort-asc').checked;
+    const sortDesc = document.getElementById('price-sort-desc').checked;
+
+    // Формуємо URL
+    let url = `/api/medications/?page=${page}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (category) url += `&category=${category}`;
+    if (prescription) url += `&is_prescription=${prescription}`;
+    if (availability) url += `&is_available=${availability}`;
+
+    // Додаємо сортування
+    if (sortAsc) {
+        url += `&ordering=price`;
+    } else if (sortDesc) {
+        url += `&ordering=-price`;
+    }
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loading').style.display = 'none';
+
+            let medications = data.results;
+
+            // Фільтр за ціною (client-side для точності)
+            if (priceMin || priceMax) {
+                medications = medications.filter(med => {
+                    const price = parseFloat(med.price);
+                    if (priceMin && price < parseFloat(priceMin)) return false;
+                    if (priceMax && price > parseFloat(priceMax)) return false;
+                    return true;
+                });
+            }
+
+            document.getElementById('results-count').textContent =
+                `Знайдено ${medications.length} препаратів`;
+
+            const grid = document.getElementById('medications-grid');
+
+            if (medications.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i> Препарати не знайдені
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            medications.forEach(med => {
+                const col = document.createElement('div');
+                col.className = 'col-md-3 mb-4';
+
+                col.innerHTML = `
+                    <div class="card medication-card h-100">
+                        ${med.image ?
+                            `<img src="${med.image}" class="medication-image" alt="${med.name}">` :
+                            '<div class="medication-image bg-light d-flex align-items-center justify-content-center"><i class="fas fa-pills fa-3x text-muted"></i></div>'
+                        }
+                        <div class="card-body d-flex flex-column">
+                            <h5 class="card-title">${med.name}</h5>
+                            <p class="card-text text-muted small">${med.manufacturer}</p>
+                            <p class="card-text text-muted small">
+                                <span class="badge bg-info">${med.category_display}</span>
+                                ${med.is_prescription ? '<span class="badge badge-prescription">За рецептом</span>' : ''}
+                            </p>
+                            <div class="mt-auto">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="price-tag">${med.price} грн</span>
+                                    ${med.in_stock ?
+                                        '<span class="badge badge-available">В наявності</span>' :
+                                        '<span class="badge bg-secondary">Немає</span>'
+                                    }
+                                </div>
+                                <a href="/medications/${med.id}/" class="btn btn-primary btn-sm w-100 mb-2">
+                                    <i class="fas fa-info-circle"></i> Детальніше
+                                </a>
+                                {% if user.is_authenticated %}
+                                ${med.in_stock ? `
+                                    <button class="btn btn-success btn-sm w-100" onclick="addToCart(${med.id}, '${med.name}')">
+                                        <i class="fas fa-cart-plus"></i> В кошик
+                                    </button>
+                                ` : ''}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                grid.appendChild(col);
+            });
+
+            // Пагінація
+            renderPagination(data);
+        })
+        .catch(error => {
+            console.error('Error loading medications:', error);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('medications-grid').innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> Помилка завантаження препаратів
+                    </div>
+                </div>
+            `;
+        });
+}
+
+// Пагінація
+function renderPagination(data) {
+    const container = document.getElementById('pagination-container');
+
+    if (!data.next && !data.previous) {
+        container.innerHTML = '';
+        return;
+    }
+
+    const totalPages = Math.ceil(data.count / 20);
+    let html = '<ul class="pagination justify-content-center">';
+
+    // Previous
+    html += `
+        <li class="page-item ${!data.previous ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadMedications(${currentPage - 1}); return false;">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        </li>
+    `;
+
+    // Pages
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+            html += `
+                <li class="page-item ${i === currentPage ? 'active' : ''}">
+                    <a class="page-link" href="#" onclick="loadMedications(${i}); return false;">${i}</a>
+                </li>
+            `;
+        } else if (i === currentPage - 3 || i === currentPage + 3) {
+            html += '<li class="page-item disabled"><span class="page-link">...</span></li>';
+        }
+    }
+
+    // Next
+    html += `
+        <li class="page-item ${!data.next ? 'disabled' : ''}">
+            <a class="page-link" href="#" onclick="loadMedications(${currentPage + 1}); return false;">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        </li>
+    `;
+
+    html += '</ul>';
+    container.innerHTML = html;
+}
+
+// Застосувати фільтри
+function applyFilters() {
+    currentPage = 1;
+    loadMedications(1);
+}
+
+// Скинути фільтри
+function resetFilters() {
+    document.getElementById('search-input').value = '';
+    document.getElementById('category-filter').value = '';
+    document.getElementById('prescription-filter').value = '';
+    document.getElementById('availability-filter').value = '';
+    document.getElementById('price-min').value = '';
+    document.getElementById('price-max').value = '';
+    document.getElementById('price-sort-asc').checked = false;
+    document.getElementById('price-sort-desc').checked = false;
+    currentPage = 1;
+    loadMedications(1);
+}
+
+// Додати в кошик
+{% if user.is_authenticated %}
+function addToCart(medicationId, medicationName) {
+    const formData = new FormData();
+    formData.append('medication_id', medicationId);
+    formData.append('quantity', 1);
+
+    fetch('/cart/add/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Оновлюємо лічильник кошика
+            document.getElementById('cart-count').textContent = data.cart_count;
+
+            // Показуємо повідомлення
+            showAlert('success', data.message);
+        } else {
+            showAlert('danger', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Помилка додавання в кошик');
+    });
+}
+{% endif %}
+
+// Показати alert
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+
+// Get CSRF token
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Завантажуємо при завантаженні сторінки
+document.addEventListener('DOMContentLoaded', () => {
+    loadMedications(1);
+
+    // Enter на полі пошуку
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            applyFilters();
+        }
+    });
+
+    // Обробка чекбоксів сортування (тільки один активний)
+    document.getElementById('price-sort-asc').addEventListener('change', function() {
+        if (this.checked) {
+            document.getElementById('price-sort-desc').checked = false;
+        }
+    });
+
+    document.getElementById('price-sort-desc').addEventListener('change', function() {
+        if (this.checked) {
+            document.getElementById('price-sort-asc').checked = false;
+        }
+    });
+});
+</script>
+{% endblock %}

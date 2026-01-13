@@ -1,0 +1,343 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Мій профіль - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-user"></i> Мій профіль
+    </h1>
+    
+    <div class="row">
+        <!-- Profile Info -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-id-card"></i> Особиста інформація</h5>
+                </div>
+                <div class="card-body">
+                    <form id="profile-form">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Ім'я</label>
+                                <input type="text" class="form-control" id="first-name" value="{{ user.first_name }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Прізвище</label>
+                                <input type="text" class="form-control" id="last-name" value="{{ user.last_name }}">
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" value="{{ user.email }}">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Телефон</label>
+                            <input type="tel" class="form-control" id="phone" value="{{ user.phone }}">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Дата народження</label>
+                            <input type="date" class="form-control" id="date-of-birth" value="{{ user.date_of_birth|date:'Y-m-d' }}">
+                        </div>
+                        
+                        <hr>
+                        
+                        <h6 class="mb-3"><i class="fas fa-bell"></i> Налаштування сповіщень</h6>
+                        
+                        <div class="form-check form-switch mb-2">
+                            <input class="form-check-input" type="checkbox" id="email-notifications" 
+                                   {% if user.email_notifications %}checked{% endif %}>
+                            <label class="form-check-label" for="email-notifications">
+                                Email сповіщення
+                            </label>
+                        </div>
+                        
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="sms-notifications"
+                                   {% if user.sms_notifications %}checked{% endif %}>
+                            <label class="form-check-label" for="sms-notifications">
+                                SMS сповіщення
+                            </label>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Зберегти зміни
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Recent Orders -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-history"></i> Останні замовлення</h5>
+                </div>
+                <div class="card-body">
+                    <div id="recent-orders">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Завантаження...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sidebar -->
+        <div class="col-md-4">
+            <!-- Loyalty Card -->
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-credit-card"></i> Картка лояльності</h5>
+                </div>
+                <div class="card-body text-center">
+                    <h3 class="mb-3">{{ user.get_card_type_display }}</h3>
+                    
+                    {% if user.card_type == 'standard' %}
+                        <div class="card-type-badge bg-secondary p-3 rounded mb-3">
+                            <i class="fas fa-star fa-2x text-white"></i>
+                        </div>
+                    {% elif user.card_type == 'premium' %}
+                        <div class="card-type-badge bg-warning p-3 rounded mb-3">
+                            <i class="fas fa-crown fa-2x text-white"></i>
+                        </div>
+                    {% elif user.card_type == 'social' %}
+                        <div class="card-type-badge bg-info p-3 rounded mb-3">
+                            <i class="fas fa-heart fa-2x text-white"></i>
+                        </div>
+                    {% endif %}
+                    
+                    <p class="mb-2">
+                        <strong>Знижка:</strong> 
+                        <span class="badge bg-success">{{ user.get_discount }}%</span>
+                    </p>
+                    
+                    <p class="mb-0 text-muted small">
+                        {% if user.card_type == 'standard' %}
+                            Робіть покупки, щоб отримати преміум-картку!
+                        {% elif user.card_type == 'premium' %}
+                            Безкоштовна доставка та 10% знижка
+                        {% elif user.card_type == 'social' %}
+                            Спеціальні знижки на ліки
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Bonus Points -->
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-gift"></i> Бонуси</h5>
+                </div>
+                <div class="card-body text-center">
+                    <h2 class="text-primary mb-2">{{ user.bonus_points }}</h2>
+                    <p class="text-muted mb-0">бонусних балів</p>
+                    <hr>
+                    <p class="small mb-0">
+                        <i class="fas fa-info-circle"></i> 
+                        Отримуйте 1 бал за кожну гривню покупки
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Statistics -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-chart-bar"></i> Статистика</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-2">
+                        <i class="fas fa-calendar-alt text-primary"></i> 
+                        Дата реєстрації:<br>
+                        <strong>{{ user.created_at|date:"d.m.Y" }}</strong>
+                    </p>
+                    <hr>
+                    <p class="mb-2">
+                        <i class="fas fa-box text-primary"></i> 
+                        Всього замовлень:<br>
+                        <strong id="total-orders">—</strong>
+                    </p>
+                    <hr>
+                    <p class="mb-0">
+                        <i class="fas fa-money-bill-wave text-primary"></i> 
+                        Загальна сума покупок:<br>
+                        <strong id="total-spent">—</strong>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Оновлення профілю
+document.getElementById('profile-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    const data = {
+        first_name: document.getElementById('first-name').value,
+        last_name: document.getElementById('last-name').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        date_of_birth: document.getElementById('date-of-birth').value,
+        email_notifications: document.getElementById('email-notifications').checked,
+        sms_notifications: document.getElementById('sms-notifications').checked
+    };
+    
+    fetch('/api/users/update_profile/', {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => response.json())
+    .then(data => {
+        showAlert('success', 'Профіль успішно оновлено!');
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Помилка оновлення профілю');
+    });
+});
+
+// Завантаження статистики
+function loadStats() {
+    fetch('/api/users/bonus_info/')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('total-orders').textContent = data.orders_count;
+            document.getElementById('total-spent').textContent = data.total_spent + ' грн';
+        });
+}
+
+// Завантаження останніх замовлень
+function loadRecentOrders() {
+    fetch('/api/orders/my_orders/?limit=5')
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('recent-orders');
+            
+            if (!data || data.length === 0) {
+                container.innerHTML = '<p class="text-muted">Замовлень немає</p>';
+                return;
+            }
+            
+            let html = '<div class="list-group">';
+            data.slice(0, 5).forEach(order => {
+                const statusColors = {
+                    'pending': 'warning',
+                    'confirmed': 'info',
+                    'completed': 'success',
+                    'cancelled': 'danger'
+                };
+                const color = statusColors[order.status] || 'secondary';
+                
+                html += `
+                    <a href="/orders/${order.id}/" class="list-group-item list-group-item-action">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>Замовлення #${order.id}</strong><br>
+                                <small class="text-muted">${new Date(order.created_at).toLocaleDateString('uk-UA')}</small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-${color}">${order.status_display}</span><br>
+                                <strong>${order.total_price} грн</strong>
+                                ${order.status === 'completed' ? `
+                                    <br><button class="btn btn-sm btn-outline-success mt-1" onclick="quickRepeatOrder(${order.id}); event.preventDefault();">
+                                        <i class="fas fa-redo"></i> Повторити
+                                    </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </a>
+                `;
+            });
+            html += '</div>';
+            
+            if (data.length > 0) {
+                html += `
+                    <div class="mt-3 text-center">
+                        <a href="{% url 'frontend:orders' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="fas fa-list"></i> Всі замовлення
+                        </a>
+                    </div>
+                `;
+            }
+            
+            container.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('recent-orders').innerHTML = 
+                '<p class="text-danger">Помилка завантаження</p>';
+        });
+}
+
+// Повторити замовлення
+function quickRepeatOrder(orderId) {
+    if (!confirm('Додати товари з цього замовлення в кошик?')) return;
+
+    fetch(`/api/orders/${orderId}/repeat_order/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', data.message);
+            setTimeout(() => window.location.href = '/cart/', 1500);
+        } else {
+            showAlert('warning', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Помилка');
+    });
+}
+
+// Допоміжні функції
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// Завантажуємо дані при завантаженні сторінки
+document.addEventListener('DOMContentLoaded', () => {
+    loadStats();
+    loadRecentOrders();
+});
+</script>
+{% endblock %}

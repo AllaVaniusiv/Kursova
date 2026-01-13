@@ -1,0 +1,280 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Наші аптеки - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1 class="mb-4">
+        <i class="fas fa-hospital"></i> Наші аптеки
+    </h1>
+    
+    <!-- Search and Filters -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Пошук за назвою або адресою</label>
+                    <input type="text" class="form-control" id="search-input" placeholder="Введіть назву або адресу...">
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Місто</label>
+                    <select class="form-select" id="city-filter">
+                        <option value="">Всі міста</option>
+                        <option value="Львів" selected>Львів</option>
+                    </select>
+                </div>
+                <div class="col-md-2 mb-3 d-flex align-items-end">
+                    <button class="btn btn-primary w-100" onclick="loadPharmacies()">
+                        <i class="fas fa-search"></i> Знайти
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading -->
+    <div id="loading" class="text-center mb-4" style="display: none;">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Завантаження...</span>
+        </div>
+    </div>
+    
+    <!-- Pharmacies List -->
+    <div class="row" id="pharmacies-container">
+        <!-- Pharmacies will be loaded here -->
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Завантаження аптек
+function loadPharmacies() {
+    document.getElementById('loading').style.display = 'block';
+    
+    const search = document.getElementById('search-input').value;
+    const city = document.getElementById('city-filter').value;
+    
+    let url = '/api/pharmacies/';
+    const params = [];
+    if (city) params.push(`city=${encodeURIComponent(city)}`);
+    if (params.length > 0) url += '?' + params.join('&');
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('loading').style.display = 'none';
+            
+            let pharmacies = data.results;
+            
+            // Фільтр по пошуку (client-side)
+            if (search) {
+                const searchLower = search.toLowerCase();
+                pharmacies = pharmacies.filter(p => 
+                    p.name.toLowerCase().includes(searchLower) ||
+                    p.address.toLowerCase().includes(searchLower)
+                );
+            }
+            
+            renderPharmacies(pharmacies);
+        })
+        .catch(error => {
+            console.error('Error loading pharmacies:', error);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('pharmacies-container').innerHTML = `
+                <div class="col-12">
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle"></i> Помилка завантаження аптек
+                    </div>
+                </div>
+            `;
+        });
+}
+
+// Відобразити аптеки
+function renderPharmacies(pharmacies) {
+    const container = document.getElementById('pharmacies-container');
+    
+    if (!pharmacies || pharmacies.length === 0) {
+        container.innerHTML = `
+            <div class="col-12">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Аптеки не знайдені
+                </div>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = pharmacies.map(pharmacy => `
+        <div class="col-md-6 mb-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-hospital text-primary"></i> ${pharmacy.name}
+                    </h5>
+                    
+                    <div class="mb-3">
+                        <p class="mb-2">
+                            <i class="fas fa-map-marker-alt text-danger"></i> 
+                            <strong>Адреса:</strong><br>
+                            ${pharmacy.address}, ${pharmacy.city}
+                        </p>
+                        
+                        <p class="mb-2">
+                            <i class="fas fa-phone text-success"></i> 
+                            <strong>Телефон:</strong><br>
+                            <a href="tel:${pharmacy.phone}">${pharmacy.phone}</a>
+                        </p>
+                        
+                        ${pharmacy.email ? `
+                            <p class="mb-2">
+                                <i class="fas fa-envelope text-info"></i> 
+                                <strong>Email:</strong><br>
+                                <a href="mailto:${pharmacy.email}">${pharmacy.email}</a>
+                            </p>
+                        ` : ''}
+                        
+                        <p class="mb-2">
+                            <i class="fas fa-clock text-warning"></i> 
+                            <strong>Графік роботи:</strong><br>
+                            ${pharmacy.working_hours}
+                        </p>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="checkStock(${pharmacy.id}, '${pharmacy.name}')">
+                            <i class="fas fa-pills"></i> Переглянути залишки
+                        </button>
+                        ${pharmacy.latitude && pharmacy.longitude ? `
+                            <a href="https://www.google.com/maps?q=${pharmacy.latitude},${pharmacy.longitude}" 
+                               target="_blank" class="btn btn-outline-secondary">
+                                <i class="fas fa-map"></i> На карті
+                            </a>
+                        ` : ''}
+                    </div>
+                </div>
+                
+                ${pharmacy.is_active ? 
+                    '<div class="card-footer bg-success text-white text-center"><i class="fas fa-check-circle"></i> Працює</div>' :
+                    '<div class="card-footer bg-secondary text-white text-center"><i class="fas fa-times-circle"></i> Закрито</div>'
+                }
+            </div>
+        </div>
+    `).join('');
+}
+
+// Перевірити залишки в аптеці
+function checkStock(pharmacyId, pharmacyName) {
+    // Створюємо модальне вікно
+    const modal = `
+        <div class="modal fade" id="stockModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">
+                            <i class="fas fa-pills"></i> Залишки: ${pharmacyName}
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div id="stock-content">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Завантаження...</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    // Видаляємо попереднє модальне вікно якщо є
+    const existingModal = document.getElementById('stockModal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    document.body.insertAdjacentHTML('beforeend', modal);
+    const modalElement = new bootstrap.Modal(document.getElementById('stockModal'));
+    modalElement.show();
+    
+    // Завантажуємо залишки
+    fetch(`/api/pharmacies/${pharmacyId}/stock/`)
+        .then(response => response.json())
+        .then(data => {
+            const container = document.getElementById('stock-content');
+            
+            if (!data.stock || data.stock.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> В цій аптеці поки немає товарів в наявності
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Препарат</th>
+                                <th>Виробник</th>
+                                <th class="text-end">Ціна</th>
+                                <th class="text-center">Кількість</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            data.stock.forEach(item => {
+                html += `
+                    <tr>
+                        <td>
+                            <strong>${item.medication_name}</strong>
+                        </td>
+                        <td class="text-muted">${item.medication.manufacturer || '—'}</td>
+                        <td class="text-end">${item.medication_price} грн</td>
+                        <td class="text-center">
+                            <span class="badge bg-success">${item.quantity} шт.</span>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+                <div class="alert alert-info mt-3">
+                    <i class="fas fa-info-circle"></i> 
+                    Всього позицій в наявності: <strong>${data.stock.length}</strong>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            document.getElementById('stock-content').innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle"></i> Помилка завантаження залишків
+                </div>
+            `;
+        });
+}
+
+// Завантажуємо при завантаженні сторінки
+document.addEventListener('DOMContentLoaded', loadPharmacies);
+
+// Enter на полі пошуку
+document.getElementById('search-input').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+        loadPharmacies();
+    }
+});
+</script>
+{% endblock %}

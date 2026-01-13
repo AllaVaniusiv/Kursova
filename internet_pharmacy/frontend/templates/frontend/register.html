@@ -1,0 +1,181 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Реєстрація - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body p-5">
+                    <h2 class="text-center mb-4">
+                        <i class="fas fa-user-plus text-primary"></i> Реєстрація
+                    </h2>
+                    
+                    <form id="register-form">
+                        <div class="mb-3">
+                            <label class="form-label">Ім'я користувача *</label>
+                            <input type="text" class="form-control" id="username" required>
+                            <small class="form-text text-muted">Тільки літери, цифри та @/./+/-/_</small>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Ім'я *</label>
+                                <input type="text" class="form-control" id="first-name" required>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Прізвище *</label>
+                                <input type="text" class="form-control" id="last-name" required>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Email *</label>
+                            <input type="email" class="form-control" id="email" required>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Телефон</label>
+                            <input type="tel" class="form-control" id="phone" placeholder="+380671234567">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Пароль *</label>
+                            <input type="password" class="form-control" id="password" required minlength="8">
+                            <small class="form-text text-muted">Мінімум 8 символів</small>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="form-label">Підтвердження пароля *</label>
+                            <input type="password" class="form-control" id="password-confirm" required minlength="8">
+                        </div>
+                        
+                        <div class="mb-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="terms" required>
+                                <label class="form-check-label" for="terms">
+                                    Я приймаю умови використання та політику конфіденційності *
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn btn-primary btn-lg w-100 mb-3">
+                            <i class="fas fa-user-plus"></i> Зареєструватися
+                        </button>
+                        
+                        <div class="text-center">
+                            <p class="mb-0">Вже є акаунт? 
+                                <a href="{% url 'login' %}">Увійти</a>
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('register-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    
+    // Перевірка паролів
+    const password = document.getElementById('password').value;
+    const passwordConfirm = document.getElementById('password-confirm').value;
+    
+    if (password !== passwordConfirm) {
+        showAlert('danger', 'Паролі не співпадають!');
+        return;
+    }
+    
+    if (!document.getElementById('terms').checked) {
+        showAlert('warning', 'Прийміть умови використання');
+        return;
+    }
+    
+    // Збираємо дані
+    const data = {
+        username: document.getElementById('username').value,
+        first_name: document.getElementById('first-name').value,
+        last_name: document.getElementById('last-name').value,
+        email: document.getElementById('email').value,
+        phone: document.getElementById('phone').value,
+        password: password,
+        password_confirm: passwordConfirm
+    };
+    
+    // Відправляємо запит
+    fetch('/api/users/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify(data)
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw err;
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        showAlert('success', 'Реєстрація успішна! Перенаправлення на сторінку входу...');
+        setTimeout(() => {
+            window.location.href = '/login/';
+        }, 2000);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        
+        // Обробка помилок валідації
+        let errorMessage = 'Помилка реєстрації. ';
+        if (error.username) {
+            errorMessage += 'Ім\'я користувача: ' + error.username.join(', ') + ' ';
+        }
+        if (error.email) {
+            errorMessage += 'Email: ' + error.email.join(', ') + ' ';
+        }
+        if (error.password) {
+            errorMessage += 'Пароль: ' + error.password.join(', ');
+        }
+        
+        showAlert('danger', errorMessage);
+    });
+});
+
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    const form = document.getElementById('register-form');
+    form.insertBefore(alertDiv, form.firstChild);
+    
+    setTimeout(() => alertDiv.remove(), 5000);
+}
+
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}

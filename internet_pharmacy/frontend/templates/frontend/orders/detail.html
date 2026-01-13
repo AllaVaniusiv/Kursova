@@ -1,0 +1,333 @@
+{% extends 'frontend/base.html' %}
+
+{% block title %}Замовлення #{{ order.id }} - Інтернет-аптека{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <!-- Breadcrumb -->
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'frontend:index' %}">Головна</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'frontend:orders' %}">Замовлення</a></li>
+            <li class="breadcrumb-item active">Замовлення #{{ order.id }}</li>
+        </ol>
+    </nav>
+    
+    <div class="row">
+        <!-- Order Info -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-box"></i> Замовлення #{{ order.id }}
+                    </h4>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <p class="mb-2">
+                                <strong>Дата створення:</strong><br>
+                                {{ order.created_at|date:"d.m.Y H:i" }}
+                            </p>
+                            <p class="mb-2">
+                                <strong>Статус:</strong><br>
+                                {% if order.status == 'pending' %}
+                                    <span class="badge bg-warning">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'completed' %}
+                                    <span class="badge bg-success">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'cancelled' %}
+                                    <span class="badge bg-danger">{{ order.get_status_display }}</span>
+                                {% else %}
+                                    <span class="badge bg-info">{{ order.get_status_display }}</span>
+                                {% endif %}
+                            </p>
+                            <p class="mb-2">
+                                <strong>Тип замовлення:</strong><br>
+                                {{ order.get_order_type_display }}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            {% if order.pharmacy %}
+                            <p class="mb-2">
+                                <strong>Аптека:</strong><br>
+                                {{ order.pharmacy.name }}<br>
+                                <small class="text-muted">{{ order.pharmacy.address }}</small>
+                            </p>
+                            {% endif %}
+                            
+                            {% if order.delivery_address %}
+                            <p class="mb-2">
+                                <strong>Адреса доставки:</strong><br>
+                                {{ order.delivery_address }}
+                            </p>
+                            {% endif %}
+                            
+                            <p class="mb-2">
+                                <strong>Спосіб оплати:</strong><br>
+                                {{ order.payment_method|default:"Не вказано" }}
+                            </p>
+                            <p class="mb-2">
+                                <strong>Оплачено:</strong>
+                                {% if order.is_paid %}
+                                    <span class="badge bg-success">Так</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Ні</span>
+                                {% endif %}
+                            </p>
+                        </div>
+                    </div>
+                    
+                    {% if order.comment %}
+                    <div class="alert alert-info">
+                        <strong>Коментар:</strong><br>
+                        {{ order.comment }}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Items -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-pills"></i> Товари в замовленні</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Препарат</th>
+                                    <th class="text-center">Кількість</th>
+                                    <th class="text-end">Ціна</th>
+                                    <th class="text-end">Сума</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in order.items.all %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.medication.name }}</strong><br>
+                                        <small class="text-muted">{{ item.medication.manufacturer }}</small>
+                                    </td>
+                                    <td class="text-center">{{ item.quantity }}</td>
+                                    <td class="text-end">{{ item.price }} грн</td>
+                                    <td class="text-end"><strong>{{ item.get_total_price }} грн</strong></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Summary -->
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-calculator"></i> Підсумок</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Сума товарів:</span>
+                        <span>{{ order.subtotal }} грн</span>
+                    </div>
+                    
+                    {% if order.discount_amount > 0 %}
+                    <div class="d-flex justify-content-between mb-2 text-success">
+                        <span>Знижка ({{ user.get_discount }}%):</span>
+                        <span>-{{ order.discount_amount }} грн</span>
+                    </div>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Доставка:</span>
+                        <span>{{ order.delivery_cost }} грн</span>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-between mb-3">
+                        <span><strong>Разом:</strong></span>
+                        <span><strong class="text-primary fs-4">{{ order.total_price }} грн</strong></span>
+                    </div>
+                    
+                    {% if order.status == 'pending' or order.status == 'confirmed' %}
+                    <button class="btn btn-danger w-100 mb-2" onclick="cancelOrder({{ order.id }})">
+                        <i class="fas fa-times"></i> Скасувати замовлення
+                    </button>
+                    {% endif %}
+
+                    {% if order.status == 'completed' %}
+                    <button class="btn btn-success w-100 mb-2" onclick="repeatOrder({{ order.id }})">
+                        <i class="fas fa-redo"></i> Повторити замовлення
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Order Timeline -->
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="fas fa-clock"></i> Статус замовлення</h5>
+                </div>
+                <div class="card-body">
+                    <div class="timeline">
+                        <div class="timeline-item {% if order.status != 'pending' %}completed{% endif %}">
+                            <i class="fas fa-check-circle"></i> Створено
+                        </div>
+                        <div class="timeline-item {% if order.status in 'confirmed,preparing,ready,in_delivery,completed' %}completed{% endif %}">
+                            <i class="fas fa-check-circle"></i> Підтверджено
+                        </div>
+                        <div class="timeline-item {% if order.status in 'preparing,ready,in_delivery,completed' %}completed{% endif %}">
+                            <i class="fas fa-check-circle"></i> Готується
+                        </div>
+                        {% if order.order_type == 'delivery' %}
+                        <div class="timeline-item {% if order.status in 'in_delivery,completed' %}completed{% endif %}">
+                            <i class="fas fa-shipping-fast"></i> В доставці
+                        </div>
+                        {% else %}
+                        <div class="timeline-item {% if order.status in 'ready,completed' %}completed{% endif %}">
+                            <i class="fas fa-box"></i> Готове до видачі
+                        </div>
+                        {% endif %}
+                        <div class="timeline-item {% if order.status == 'completed' %}completed{% endif %}">
+                            <i class="fas fa-flag-checkered"></i> Завершено
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.timeline {
+    position: relative;
+}
+
+.timeline-item {
+    padding: 10px 0 10px 30px;
+    position: relative;
+    color: #999;
+}
+
+.timeline-item:before {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #ddd;
+}
+
+.timeline-item:last-child:before {
+    display: none;
+}
+
+.timeline-item i {
+    position: absolute;
+    left: 0;
+    top: 12px;
+    color: #ddd;
+}
+
+.timeline-item.completed {
+    color: #2c7a7b;
+    font-weight: 500;
+}
+
+.timeline-item.completed i {
+    color: #2c7a7b;
+}
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Скасувати замовлення
+function cancelOrder(orderId) {
+    if (!confirm('Ви впевнені, що хочете скасувати це замовлення?')) return;
+
+    fetch(`/api/orders/${orderId}/cancel/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        showAlert('success', 'Замовлення скасовано');
+        setTimeout(() => location.reload(), 1500);
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Помилка скасування замовлення');
+    });
+}
+
+// Повторити замовлення
+function repeatOrder(orderId) {
+    if (!confirm('Додати всі товари з цього замовлення в кошик?')) return;
+
+    fetch(`/api/orders/${orderId}/repeat_order/`, {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': getCookie('csrftoken')
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showAlert('success', data.message);
+            // Оновлюємо лічильник кошика
+            if (data.cart_items_count) {
+                document.getElementById('cart-count').textContent = data.cart_items_count;
+            }
+            // Перенаправляємо в кошик
+            setTimeout(() => {
+                window.location.href = '/cart/';
+            }, 1500);
+        } else {
+            showAlert('warning', data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        showAlert('danger', 'Помилка повторення замовлення');
+    });
+}
+
+// Показати повідомлення
+function showAlert(type, message) {
+    const alertDiv = document.createElement('div');
+    alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+    alertDiv.style.zIndex = '9999';
+    alertDiv.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    document.body.appendChild(alertDiv);
+    setTimeout(() => alertDiv.remove(), 3000);
+}
+
+// Отримати CSRF токен
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+</script>
+{% endblock %}
